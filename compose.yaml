@@ -1,0 +1,7 @@
+﻿services:
+  weyutelegramnotify:
+    image: weyutelegramnotify
+    build:
+      context: .
+      dockerfile: WeYuTelegramNotify/Dockerfile
+
