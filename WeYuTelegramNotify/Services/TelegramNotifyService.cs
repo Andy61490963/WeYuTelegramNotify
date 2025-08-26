@@ -1,15 +1,17 @@
-using System.Net.Http.Json;
+using Microsoft.Data.SqlClient;
 using WeYuTelegramNotify.Models;
 
 namespace WeYuTelegramNotify.Services;
 
 public class TelegramNotifyService : ITelegramNotifyService
 {
+    private readonly SqlConnection _con;
     private const int MaxMessageLength = 4096;
     private readonly IHttpClientFactory _httpClientFactory;
 
-    public TelegramNotifyService(IHttpClientFactory httpClientFactory)
+    public TelegramNotifyService(SqlConnection con, IHttpClientFactory httpClientFactory)
     {
+        _con = con;
         _httpClientFactory = httpClientFactory;
     }
 

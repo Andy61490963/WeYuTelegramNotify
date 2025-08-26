@@ -1,3 +1,4 @@
+using Microsoft.Data.SqlClient;
 using WeYuTelegramNotify.Options;
 using WeYuTelegramNotify.Services;
 using Microsoft.Extensions.Options;
@@ -22,6 +23,14 @@ public class Program
             client.BaseAddress = new Uri($"{options.BaseUrl}{options.BotToken}/");
         });
 
+        // -------------------- 連線字串 --------------------
+        builder.Services.AddScoped<SqlConnection, SqlConnection>(_ =>
+        {
+            var conn = new SqlConnection();
+            conn.ConnectionString = builder.Configuration.GetConnectionString("Connection");
+            return conn;
+        });
+        
         builder.Services.AddScoped<ITelegramNotifyService, TelegramNotifyService>();
 
         var app = builder.Build();

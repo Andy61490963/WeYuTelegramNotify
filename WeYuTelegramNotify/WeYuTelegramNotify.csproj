@@ -8,7 +8,9 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <PackageReference Include="Dapper" Version="2.1.66" />
         <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.0-preview.6.25358.103"/>
+        <PackageReference Include="Microsoft.Data.SqlClient" Version="6.1.1" />
     </ItemGroup>
 
     <ItemGroup>
