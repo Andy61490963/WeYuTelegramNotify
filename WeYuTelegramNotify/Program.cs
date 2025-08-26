@@ -13,7 +13,6 @@ public class Program
         builder.Services.AddControllers();
         builder.Services.AddEndpointsApiExplorer();
         builder.Services.AddAuthorization();
-        builder.Services.AddOpenApi();
 
         builder.Services.Configure<TelegramBotOptions>(builder.Configuration.GetSection("TelegramBot"));
 
@@ -29,7 +28,6 @@ public class Program
 
         if (app.Environment.IsDevelopment())
         {
-            app.MapOpenApi();
         }
 
         app.UseHttpsRedirection();

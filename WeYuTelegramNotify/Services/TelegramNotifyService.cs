@@ -13,6 +13,12 @@ public class TelegramNotifyService : ITelegramNotifyService
         _httpClientFactory = httpClientFactory;
     }
 
+    /// <summary>
+    /// 發送訊息
+    /// </summary>
+    /// <param name="request"></param>
+    /// <param name="cancellationToken"></param>
+    /// <exception cref="HttpRequestException"></exception>
     public async Task SendAsync(TelegramNotifyRequest request, CancellationToken cancellationToken = default)
     {
         var client = _httpClientFactory.CreateClient("Telegram");
@@ -37,6 +43,12 @@ public class TelegramNotifyService : ITelegramNotifyService
         }
     }
 
+    /// <summary>
+    /// 訊息太長，截斷發兩次
+    /// </summary>
+    /// <param name="text"></param>
+    /// <param name="chunkSize"></param>
+    /// <returns></returns>
     private static IEnumerable<string> SplitMessage(string text, int chunkSize)
     {
         for (var i = 0; i < text.Length; i += chunkSize)
