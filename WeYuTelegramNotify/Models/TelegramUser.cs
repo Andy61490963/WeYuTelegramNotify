@@ -8,17 +8,17 @@ namespace WeYuTelegramNotify.Models;
 public class TelegramUser
 {
     /// <summary>Primary key.</summary>
-    public Guid Id { get; set; }
+    public Guid ID { get; set; }
 
     /// <summary>Telegram chat identifier.</summary>
-    public long ChatId { get; set; }
+    public long CHAT_ID { get; set; }
 
-    public string? Username { get; set; }
+    public string? DISPLAY_NAME { get; set; }
 
-    public string? DisplayName { get; set; }
+    public int TYPE { get; set; }
 
     /// <summary>Record active flag.</summary>
-    public bool IsActive { get; set; }
+    public bool IS_ACTIVE { get; set; }
 
-    public DateTime CreatedAt { get; set; }
+    public DateTime CREATED_AT { get; set; }
 }

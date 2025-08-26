@@ -11,8 +11,8 @@ public class TelegramNotifyRequest
     public string Body { get; set; } = string.Empty;
 
     [Required]
-    public long GroupId { get; set; }
+    public Guid Id { get; set; }
 
-    public string ParseMode { get; set; } = "HTML";
+    public Guid TemplateId { get; set; }
 }
 

@@ -1,3 +1,4 @@
+using WeYuTelegramNotify.Enum;
 using WeYuTelegramNotify.Models;
 
 namespace WeYuTelegramNotify.Repositories;
@@ -7,7 +8,7 @@ namespace WeYuTelegramNotify.Repositories;
 /// </summary>
 public interface ITelegramRepository
 {
-    Task<TelegramGroup> GetOrCreateGroupAsync(long chatId, CancellationToken cancellationToken = default);
+    Task<TelegramUser?> GetSingleOrGroup(Guid id, CancellationToken cancellationToken = default);
 
     Task<Guid> InsertLogAsync(TelegramMessageLog log, CancellationToken cancellationToken = default);
 

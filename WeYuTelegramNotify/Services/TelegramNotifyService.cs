@@ -1,3 +1,4 @@
+using WeYuTelegramNotify.Enum;
 using WeYuTelegramNotify.Models;
 using WeYuTelegramNotify.Repositories;
 
@@ -23,15 +24,23 @@ public class TelegramNotifyService : ITelegramNotifyService
     /// <exception cref="HttpRequestException"></exception>
     public async Task SendAsync(TelegramNotifyRequest request, CancellationToken cancellationToken = default)
     {
-        // Ensure group exists and create initial log entry.
-        var group = await _repository.GetOrCreateGroupAsync(request.GroupId, cancellationToken).ConfigureAwait(false);
+        var result = await _repository.GetSingleOrGroup(request.Id, cancellationToken);
+
+        if (result == null)
+        {
+            return;
+        }
+
         var log = new TelegramMessageLog
         {
-            TelegramGroupId = group.Id,
-            Subject = request.Subject,
-            Body = request.Body,
-            Status = 0
+            TELEGRAM_USER_ID = result.ID,
+            TELEGRAM_MESSAGE_TEMPLATE_ID = request.TemplateId,
+            SUBJECT = request.Subject,
+            BODY = request.Body,
+            STATUS = SendStatus.Queued,
+            CREATED_AT = DateTime.Now,
         };
+        
         var logId = await _repository.InsertLogAsync(log, cancellationToken).ConfigureAwait(false);
 
         try
@@ -43,9 +52,8 @@ public class TelegramNotifyService : ITelegramNotifyService
             {
                 var payload = new Dictionary<string, string>
                 {
-                    ["chat_id"] = request.GroupId.ToString(),
-                    ["text"] = header + chunk,
-                    ["parse_mode"] = request.ParseMode
+                    ["chat_id"] = result.CHAT_ID.ToString(),
+                    ["text"] = header + chunk
                 };
 
                 using var content = new FormUrlEncodedContent(payload);

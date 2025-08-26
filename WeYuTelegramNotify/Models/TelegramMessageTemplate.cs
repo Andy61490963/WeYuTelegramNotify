@@ -7,12 +7,12 @@ namespace WeYuTelegramNotify.Models;
 /// </summary>
 public class TelegramMessageTemplate
 {
-    public Guid Id { get; set; }
+    public Guid ID { get; set; }
 
     /// <summary>Unique template code.</summary>
-    public string Code { get; set; } = string.Empty;
+    public string CODE { get; set; } = string.Empty;
 
-    public string? Subject { get; set; }
+    public string? SUBJECT { get; set; }
 
-    public string Body { get; set; } = string.Empty;
+    public string BODY { get; set; } = string.Empty;
 }
