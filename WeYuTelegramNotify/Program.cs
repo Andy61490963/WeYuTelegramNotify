@@ -1,3 +1,7 @@
+using WeYuTelegramNotify.Options;
+using WeYuTelegramNotify.Services;
+using Microsoft.Extensions.Options;
+
 namespace WeYuTelegramNotify;
 
 public class Program
@@ -6,29 +10,32 @@ public class Program
     {
         var builder = WebApplication.CreateBuilder(args);
 
-        // Add services to the container.
+        builder.Services.AddControllers();
+        builder.Services.AddEndpointsApiExplorer();
         builder.Services.AddAuthorization();
-
-        // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
         builder.Services.AddOpenApi();
+
+        builder.Services.Configure<TelegramBotOptions>(builder.Configuration.GetSection("TelegramBot"));
+
+        builder.Services.AddHttpClient("Telegram", (sp, client) =>
+        {
+            var options = sp.GetRequiredService<IOptions<TelegramBotOptions>>().Value;
+            client.BaseAddress = new Uri($"{options.BaseUrl}{options.BotToken}/");
+        });
+
+        builder.Services.AddScoped<ITelegramNotifyService, TelegramNotifyService>();
 
         var app = builder.Build();
 
-        // Configure the HTTP request pipeline.
         if (app.Environment.IsDevelopment())
         {
             app.MapOpenApi();
         }
 
         app.UseHttpsRedirection();
-
         app.UseAuthorization();
-
-        var summaries = new[]
-        {
-            "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-        };
-
+        app.MapControllers();
         app.Run();
     }
 }
+
