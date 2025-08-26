@@ -1,18 +1,18 @@
-using Microsoft.Data.SqlClient;
 using WeYuTelegramNotify.Models;
+using WeYuTelegramNotify.Repositories;
 
 namespace WeYuTelegramNotify.Services;
 
 public class TelegramNotifyService : ITelegramNotifyService
 {
-    private readonly SqlConnection _con;
     private const int MaxMessageLength = 4096;
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly ITelegramRepository _repository;
 
-    public TelegramNotifyService(SqlConnection con, IHttpClientFactory httpClientFactory)
+    public TelegramNotifyService(IHttpClientFactory httpClientFactory, ITelegramRepository repository)
     {
-        _con = con;
         _httpClientFactory = httpClientFactory;
+        _repository = repository;
     }
 
     /// <summary>
@@ -23,25 +23,46 @@ public class TelegramNotifyService : ITelegramNotifyService
     /// <exception cref="HttpRequestException"></exception>
     public async Task SendAsync(TelegramNotifyRequest request, CancellationToken cancellationToken = default)
     {
-        var client = _httpClientFactory.CreateClient("Telegram");
-        var header = $"<b>{request.Subject}</b>\n\n";
-        var maxBodyLength = MaxMessageLength - header.Length;
-        foreach (var chunk in SplitMessage(request.Body, maxBodyLength))
+        // Ensure group exists and create initial log entry.
+        var group = await _repository.GetOrCreateGroupAsync(request.GroupId, cancellationToken).ConfigureAwait(false);
+        var log = new TelegramMessageLog
         {
-            var payload = new Dictionary<string, string>
-            {
-                ["chat_id"] = request.GroupId.ToString(),
-                ["text"] = header + chunk,
-                ["parse_mode"] = request.ParseMode
-            };
+            TelegramGroupId = group.Id,
+            Subject = request.Subject,
+            Body = request.Body,
+            Status = 0
+        };
+        var logId = await _repository.InsertLogAsync(log, cancellationToken).ConfigureAwait(false);
 
-            using var content = new FormUrlEncodedContent(payload);
-            using var response = await client.PostAsync("sendMessage", content, cancellationToken);
-            if (!response.IsSuccessStatusCode)
+        try
+        {
+            var client = _httpClientFactory.CreateClient("Telegram");
+            var header = $"<b>{request.Subject}</b>\n\n";
+            var maxBodyLength = MaxMessageLength - header.Length;
+            foreach (var chunk in SplitMessage(request.Body, maxBodyLength))
             {
-                var body = await response.Content.ReadAsStringAsync(cancellationToken);
-                throw new HttpRequestException($"Telegram API error: {response.StatusCode} - {body}");
+                var payload = new Dictionary<string, string>
+                {
+                    ["chat_id"] = request.GroupId.ToString(),
+                    ["text"] = header + chunk,
+                    ["parse_mode"] = request.ParseMode
+                };
+
+                using var content = new FormUrlEncodedContent(payload);
+                using var response = await client.PostAsync("sendMessage", content, cancellationToken).ConfigureAwait(false);
+                if (!response.IsSuccessStatusCode)
+                {
+                    var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+                    throw new HttpRequestException($"Telegram API error: {response.StatusCode} - {body}");
+                }
             }
+
+            await _repository.UpdateLogStatusAsync(logId, 1, null, DateTime.UtcNow, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            await _repository.UpdateLogStatusAsync(logId, 2, ex.Message, null, cancellationToken).ConfigureAwait(false);
+            throw;
         }
     }
 

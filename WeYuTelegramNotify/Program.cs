@@ -2,6 +2,7 @@ using Microsoft.Data.SqlClient;
 using WeYuTelegramNotify.Options;
 using WeYuTelegramNotify.Services;
 using Microsoft.Extensions.Options;
+using WeYuTelegramNotify.Repositories;
 
 namespace WeYuTelegramNotify;
 
@@ -31,6 +32,7 @@ public class Program
             return conn;
         });
         
+        builder.Services.AddScoped<ITelegramRepository, TelegramRepository>();
         builder.Services.AddScoped<ITelegramNotifyService, TelegramNotifyService>();
 
         var app = builder.Build();
