@@ -3,35 +3,20 @@ namespace WeYuTelegramNotify.Models;
 public enum FailureStage
 {
     /// <summary>
-    /// Body/TemplateId 條件不符、參數不正確
+    /// 請求資料不正確或缺少必要欄位
     /// </summary>
-    Validation,        
-    
-    /// <summary>
-    /// 找不到或非啟用的目標
-    /// </summary>
-    TargetLookup,      
-    
-    /// <summary>
-    /// 找不到模板
-    /// </summary>
-    TemplateLookup,   
-    
-    /// <summary>
-    /// 模板渲染錯誤
-    /// </summary>
-    Render,            
-    
+    Validation,
+
     /// <summary>
     /// 呼叫 Telegram API 失敗
     /// </summary>
-    HttpSend,         
-    
+    HttpSend,
+
     /// <summary>
     /// DB 寫入/更新失敗
     /// </summary>
-    DbWrite, 
-    
+    DbWrite,
+
     Unknown
 }
 

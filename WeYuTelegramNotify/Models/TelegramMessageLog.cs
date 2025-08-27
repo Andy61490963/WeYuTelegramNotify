@@ -9,10 +9,8 @@ namespace WeYuTelegramNotify.Models;
 public class TelegramMessageLog
 {
     public Guid ID { get; set; }
-    
-    public Guid? TELEGRAM_ID { get; set; }
 
-    public Guid? TELEGRAM_MESSAGE_TEMPLATE_ID { get; set; }
+    public string CHAT_ID { get; set; } = string.Empty;
 
     public string SUBJECT { get; set; } = string.Empty;
 

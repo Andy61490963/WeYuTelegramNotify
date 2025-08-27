@@ -45,12 +45,10 @@ public class NotifyController : ControllerBase
         // 失敗依 Stage 分類 HTTP 狀態碼
         var status = result.Stage switch
         {
-            FailureStage.Validation      => StatusCodes.Status400BadRequest,
-            FailureStage.TargetLookup    => StatusCodes.Status404NotFound,
-            FailureStage.TemplateLookup  => StatusCodes.Status404NotFound,
-            FailureStage.HttpSend        => StatusCodes.Status502BadGateway, // 上游（Telegram）失敗
-            FailureStage.DbWrite         => StatusCodes.Status500InternalServerError,
-            _                            => StatusCodes.Status500InternalServerError
+            FailureStage.Validation => StatusCodes.Status400BadRequest,
+            FailureStage.HttpSend   => StatusCodes.Status502BadGateway, // 上游（Telegram）失敗
+            FailureStage.DbWrite    => StatusCodes.Status500InternalServerError,
+            _                       => StatusCodes.Status500InternalServerError
         };
 
         return StatusCode(status, new

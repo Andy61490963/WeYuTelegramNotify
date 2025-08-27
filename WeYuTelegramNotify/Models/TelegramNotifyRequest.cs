@@ -1,26 +1,31 @@
 using System.ComponentModel.DataAnnotations;
 
+namespace WeYuTelegramNotify.Models;
+
 public class TelegramNotifyRequest : IValidatableObject
 {
-    public string? Subject { get; set; }
-    public string? Body { get; set; }                  // ← 不必 Required，允許用模板
-    public Guid? TemplateId { get; set; }             // ← 允許 null
     [Required]
-    public Guid Id { get; set; }
+    public string ChatId { get; set; } = string.Empty;
 
-    public IDictionary<string, string?> Tokens { get; init; }
-        = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+    public string? Subject { get; set; }
+
+    [Required]
+    public string Body { get; set; } = string.Empty;
 
     public IEnumerable<ValidationResult> Validate(ValidationContext _)
     {
-        bool hasBody = !string.IsNullOrWhiteSpace(Body);
-        bool hasTpl  = TemplateId.HasValue && TemplateId.Value != Guid.Empty;
-
-        if (!hasBody && !hasTpl)
+        if (string.IsNullOrWhiteSpace(ChatId))
         {
             yield return new ValidationResult(
-                "Body 或 TemplateId 需至少提供一個。",
-                new[] { nameof(Body), nameof(TemplateId) });
+                "ChatId is required.",
+                new[] { nameof(ChatId) });
+        }
+
+        if (string.IsNullOrWhiteSpace(Body))
+        {
+            yield return new ValidationResult(
+                "Body is required.",
+                new[] { nameof(Body) });
         }
     }
 }
