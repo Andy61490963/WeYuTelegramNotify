@@ -76,7 +76,6 @@ public class TelegramNotifyService : ITelegramNotifyService
                 subjectTemplate: subjectTpl,
                 bodyTemplate:    bodyTpl,
                 data: tokens,
-                culture: CultureInfo.GetCultureInfo("zh-TW"),
                 htmlEncodeValues: false
             );
 
