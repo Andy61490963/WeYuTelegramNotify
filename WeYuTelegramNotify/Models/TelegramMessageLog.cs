@@ -9,12 +9,8 @@ namespace WeYuTelegramNotify.Models;
 public class TelegramMessageLog
 {
     public Guid ID { get; set; }
-
-    public string? TEMPLATE_CODE { get; set; }
-
+    
     public Guid? TELEGRAM_USER_ID { get; set; }
-
-    public Guid? TELEGRAM_GROUP_ID { get; set; }
 
     public Guid? TELEGRAM_MESSAGE_TEMPLATE_ID { get; set; }
 

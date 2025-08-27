@@ -26,34 +26,39 @@ public class TelegramRepository : ITelegramRepository
         }
     }
 
-    public async Task<TelegramUser?> GetSingleOrGroup(Guid id, CancellationToken cancellationToken = default)
+    public async Task<TelegramUser?> GetSingleOrGroupAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        await EnsureConnectionAsync(cancellationToken).ConfigureAwait(false);
+        
+        const string sqlUser = @"/**/
+SELECT TOP 1 ID, CHAT_ID, DISPLAY_NAME, TYPE, IS_ACTIVE, CREATED_AT FROM TELEGRAM_USER WHERE ID = @id";
+        var res = await _con.QueryFirstOrDefaultAsync<TelegramUser>(
+            new CommandDefinition(sqlUser, new { id }, cancellationToken: cancellationToken)).ConfigureAwait(false);
+        return res;
+    }
+
+    public async Task<TelegramMessageTemplate?> GetTemplateByIdAsync(Guid? id, CancellationToken cancellationToken = default)
     {
         await EnsureConnectionAsync(cancellationToken).ConfigureAwait(false);
 
-        string selectSql = "SELECT TOP 1 * FROM TELEGRAM_GROUP WHERE id = @id";
-        var result = await _con.QueryFirstOrDefaultAsync(new CommandDefinition(selectSql, new { id }, cancellationToken: cancellationToken));
-
-        if (result is not null)
-        {
-            return result;
-        }
-        return null;
+        const string sql = @"SELECT TOP 1 * FROM TELEGRAM_MESSAGE_TEMPLATE WHERE ID = @id";
+        return await _con.QueryFirstOrDefaultAsync<TelegramMessageTemplate>(
+            new CommandDefinition(sql, new { id }, cancellationToken: cancellationToken)).ConfigureAwait(false);
     }
 
     public async Task<Guid> InsertLogAsync(TelegramMessageLog log, CancellationToken cancellationToken = default)
     {
         await EnsureConnectionAsync(cancellationToken).ConfigureAwait(false);
-        
-        log.ID = Guid.NewGuid();
+
+        log.ID = log.ID == Guid.Empty ? Guid.NewGuid() : log.ID;
 
         const string sql = @"
-        INSERT INTO TELEGRAM_MESSAGE_LOG
-            (ID, TEMPLATE_CODE, TELEGRAM_USER_ID, TELEGRAM_GROUP_ID, TELEGRAM_MESSAGE_TEMPLATE_ID, SUBJECT, BODY, STATUS, ERROR_MESSAGE, RETRY_COUNT, CREATED_AT, SENT_AT)
-        VALUES
-            (@Id, @TemplateCode, @TelegramUserId, @TelegramGroupId, @TelegramMessageTemplateId, @Subject, @Body, @Status, @ErrorMessage, @RetryCount, @CreatedAt, @SentAt)";
+INSERT INTO TELEGRAM_MESSAGE_LOG
+    (ID, TELEGRAM_USER_ID, TELEGRAM_MESSAGE_TEMPLATE_ID, SUBJECT, BODY, STATUS, ERROR_MESSAGE, RETRY_COUNT, CREATED_AT, SENT_AT)
+VALUES
+    (@Id, @TELEGRAM_USER_ID, @TELEGRAM_MESSAGE_TEMPLATE_ID, @SUBJECT, @BODY, @STATUS, @ERROR_MESSAGE, @RETRY_COUNT, @CREATED_AT, @SENT_AT)";
 
         await _con.ExecuteAsync(new CommandDefinition(sql, log, cancellationToken: cancellationToken)).ConfigureAwait(false);
-
         return log.ID;
     }
 
@@ -62,17 +67,8 @@ public class TelegramRepository : ITelegramRepository
         await EnsureConnectionAsync(cancellationToken).ConfigureAwait(false);
 
         const string sql = @"UPDATE TELEGRAM_MESSAGE_LOG
-                               SET STATUS = @Status, ERROR_MESSAGE = @ErrorMessage, SENT_AT = @SentAt
+                             SET STATUS = @Status, ERROR_MESSAGE = @ErrorMessage, SENT_AT = @SentAt
                              WHERE ID = @Id";
-
         await _con.ExecuteAsync(new CommandDefinition(sql, new { Id = id, Status = status, ErrorMessage = errorMessage, SentAt = sentAt }, cancellationToken: cancellationToken)).ConfigureAwait(false);
-    }
-
-    public async Task<TelegramMessageTemplate?> GetTemplateByCodeAsync(string code, CancellationToken cancellationToken = default)
-    {
-        await EnsureConnectionAsync(cancellationToken).ConfigureAwait(false);
-
-        const string sql = "SELECT TOP 1 * FROM TELEGRAM_MESSAGE_TEMPLATE WHERE CODE = @Code";
-        return await _con.QuerySingleOrDefaultAsync<TelegramMessageTemplate>(new CommandDefinition(sql, new { Code = code }, cancellationToken: cancellationToken)).ConfigureAwait(false);
     }
 }

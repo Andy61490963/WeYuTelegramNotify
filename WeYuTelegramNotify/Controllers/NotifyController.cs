@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
+using WeYuTelegramNotify.interfaces;
 using WeYuTelegramNotify.Models;
-using WeYuTelegramNotify.Services;
 
 namespace WeYuTelegramNotify.Controllers;
 
@@ -19,20 +19,40 @@ public class NotifyController : ControllerBase
     public async Task<IActionResult> PostTelegram([FromBody] TelegramNotifyRequest request, CancellationToken cancellationToken)
     {
         if (!ModelState.IsValid)
-        {
             return ValidationProblem(ModelState);
+
+        var result = await _telegramService.SendAsync(request, cancellationToken);
+
+        if (result.Success)
+        {
+            return Ok(new
+            {
+                message = "sent",
+                subject = result.Subject,
+                body = result.Body,
+                logId = result.LogId
+            });
         }
 
-        var requestId = Guid.NewGuid();
-        try
+        // 失敗依 Stage 分類 HTTP 狀態碼
+        var status = result.Stage switch
         {
-            await _telegramService.SendAsync(request, cancellationToken);
-            return Accepted(new { requestId });
-        }
-        catch (Exception ex)
+            FailureStage.Validation      => StatusCodes.Status400BadRequest,
+            FailureStage.TargetLookup    => StatusCodes.Status404NotFound,
+            FailureStage.TemplateLookup  => StatusCodes.Status404NotFound,
+            FailureStage.HttpSend        => StatusCodes.Status502BadGateway, // 上游（Telegram）失敗
+            FailureStage.DbWrite         => StatusCodes.Status500InternalServerError,
+            _                            => StatusCodes.Status500InternalServerError
+        };
+
+        return StatusCode(status, new
         {
-            return StatusCode(502, new { error = ex.Message, requestId });
-        }
+            message = "failed",
+            stage = result.Stage?.ToString(),
+            error = result.Error,
+            httpStatus = result.HttpStatus,
+            logId = result.LogId
+        });
     }
 }
 
