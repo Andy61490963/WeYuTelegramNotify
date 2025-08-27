@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.RegularExpressions;
 using WeYuTelegramNotify.Enum;
 using WeYuTelegramNotify.interfaces;
 using WeYuTelegramNotify.Models;
@@ -10,6 +11,10 @@ public class TelegramNotifyService : ITelegramNotifyService
     private const int MaxMessageLength = 4096; // Telegram text hard limit
     private readonly ITelegramRepository _repository;
     private readonly IHttpClientFactory _httpClientFactory;
+
+    // {{Key}}
+    private static readonly Regex TokenRegex =
+        new(@"\{\{(?<raw>[^}]+)\}\}", RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
     public TelegramNotifyService(
         ITelegramRepository repository,
@@ -32,12 +37,22 @@ public class TelegramNotifyService : ITelegramNotifyService
             if (string.IsNullOrWhiteSpace(request.Body))
                 return new TelegramSendResult { Success = false, Stage = FailureStage.Validation, Error = "Body is required." };
 
+            // ── Token 替換
+            var tokens = new Dictionary<string, string?>(request.Tokens, StringComparer.OrdinalIgnoreCase)
+            {
+                ["Now"]    = DateTime.UtcNow.ToString("O"),
+                ["ChatId"] = request.ChatId
+            };
+
+            var subject = ReplaceTokens(request.Subject, tokens);
+            var body    = ReplaceTokens(request.Body, tokens);
+
             stage = FailureStage.DbWrite;
             var log = new TelegramMessageLog
             {
                 CHAT_ID = request.ChatId,
-                SUBJECT = request.Subject ?? string.Empty,
-                BODY = request.Body,
+                SUBJECT = subject,
+                BODY = body,
                 STATUS = SendStatus.Queued,
                 CREATED_AT = DateTime.UtcNow,
                 RETRY_COUNT = 0
@@ -46,10 +61,10 @@ public class TelegramNotifyService : ITelegramNotifyService
 
             stage = FailureStage.HttpSend;
             var client = _httpClientFactory.CreateClient("Telegram");
-            var header = string.IsNullOrWhiteSpace(request.Subject) ? string.Empty : $"<b>{request.Subject}</b>\n\n";
+            var header = string.IsNullOrWhiteSpace(subject) ? string.Empty : $"<b>{subject}</b>\n\n";
             var maxBodyLength = Math.Max(0, MaxMessageLength - header.Length);
 
-            foreach (var chunk in SplitMessageSafe(request.Body, maxBodyLength))
+            foreach (var chunk in SplitMessageSafe(body, maxBodyLength))
             {
                 var payload = new Dictionary<string, string>
                 {
@@ -74,8 +89,8 @@ public class TelegramNotifyService : ITelegramNotifyService
                         Error = $"Telegram API error: {(int)response.StatusCode} {response.StatusCode}",
                         HttpStatus = (int)response.StatusCode,
                         LogId = logId,
-                        Subject = request.Subject,
-                        Body = request.Body
+                        Subject = subject,
+                        Body = body
                     };
                 }
             }
@@ -87,8 +102,8 @@ public class TelegramNotifyService : ITelegramNotifyService
             {
                 Success = true,
                 LogId = logId,
-                Subject = request.Subject,
-                Body = request.Body
+                Subject = subject,
+                Body = body
             };
         }
         catch (ValidationException vex)
@@ -166,5 +181,19 @@ public class TelegramNotifyService : ITelegramNotifyService
         if (char.IsLowSurrogate(c) && end - 2 >= start && char.IsHighSurrogate(s[end - 2]))
             return end - 1;
         return end;
+    }
+
+    private static string ReplaceTokens(string? template, IReadOnlyDictionary<string, string?> data)
+    {
+        if (string.IsNullOrEmpty(template) || data.Count == 0)
+            return template ?? string.Empty;
+
+        return TokenRegex.Replace(template, m =>
+        {
+            var raw = m.Groups["raw"].Value;
+            var pipe = raw.IndexOf('|');
+            var key = (pipe >= 0 ? raw[..pipe] : raw).Trim();
+            return data.TryGetValue(key, out var val) && val is not null ? val : m.Value;
+        });
     }
 }
