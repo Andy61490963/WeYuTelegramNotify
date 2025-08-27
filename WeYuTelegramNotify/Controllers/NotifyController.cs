@@ -14,13 +14,13 @@ public class NotifyController : ControllerBase
     {
         _telegramService = telegramService;
     }
-
+    
     [HttpGet("telegram")]
     public Task<IActionResult> GetTelegram([FromQuery] TelegramNotifyRequest request, CancellationToken cancellationToken)
         => SendTelegramAsync(request, cancellationToken);
 
     [HttpPost("telegram")]
-    public Task<IActionResult> PostTelegram([FromBody] TelegramNotifyRequest request, CancellationToken cancellationToken)
+    public Task<IActionResult> PostTelegramForm([FromForm] TelegramNotifyRequest request, CancellationToken cancellationToken)
         => SendTelegramAsync(request, cancellationToken);
 
     private async Task<IActionResult> SendTelegramAsync(TelegramNotifyRequest request, CancellationToken cancellationToken)

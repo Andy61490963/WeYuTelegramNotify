@@ -8,8 +8,8 @@ public class TelegramNotifyRequest : IValidatableObject
     [Required]
     public Guid Id { get; set; }
 
-    public IDictionary<string, object?> Tokens { get; init; }
-        = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+    public IDictionary<string, string?> Tokens { get; init; }
+        = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
 
     public IEnumerable<ValidationResult> Validate(ValidationContext _)
     {

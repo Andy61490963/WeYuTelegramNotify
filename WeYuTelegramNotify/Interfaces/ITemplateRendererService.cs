@@ -8,7 +8,7 @@ public interface ITemplateRendererService
     (string Subject, string Body) Render(
         string? subjectTemplate,
         string bodyTemplate,
-        IReadOnlyDictionary<string, object?> data,
+        IReadOnlyDictionary<string, string?> data,
         CultureInfo? culture = null,
         bool htmlEncodeValues = true);
 }

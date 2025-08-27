@@ -11,7 +11,7 @@ public class TelegramUser
     public Guid ID { get; set; }
 
     /// <summary>Telegram chat identifier.</summary>
-    public long CHAT_ID { get; set; }
+    public string CHAT_ID { get; set; }
 
     public string? DISPLAY_NAME { get; set; }
 

@@ -57,9 +57,9 @@ public class TelegramNotifyService : ITelegramNotifyService
             }
 
             // ── 3) Tokens
-            var tokens = new Dictionary<string, object?>(request.Tokens, StringComparer.OrdinalIgnoreCase)
+            var tokens = new Dictionary<string, string?>(request.Tokens, StringComparer.OrdinalIgnoreCase)
             {
-                ["Now"]          = DateTime.UtcNow,
+                ["Now"]          = DateTime.UtcNow.ToString(),
                 ["DisplayName"]  = target.DISPLAY_NAME,
                 ["ChatId"]       = target.CHAT_ID,
                 ["TemplateCode"] = template?.CODE
