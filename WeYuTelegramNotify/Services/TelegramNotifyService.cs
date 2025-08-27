@@ -42,9 +42,9 @@ public class TelegramNotifyService : ITelegramNotifyService
 
             // ── 1) 取目標
             stage = FailureStage.TargetLookup;
-            var target = await _repository.GetSingleOrGroupAsync(request.Id, cancellationToken).ConfigureAwait(false);
-            if (target is null || !target.IS_ACTIVE)
-                return new TelegramSendResult { Success = false, Stage = FailureStage.TargetLookup, Error = "Target 不存在或未啟用。" };
+            var target = await _repository.GetTargetWithChatsAsync(request.Id, cancellationToken).ConfigureAwait(false);
+            if (target is null || !target.IS_ACTIVE || target.CHAT_IDS.Count == 0)
+                return new TelegramSendResult { Success = false, Stage = FailureStage.TargetLookup, Error = "Target 不存在、未啟用或沒有任何 ChatId。" };
 
             // ── 2) 取模板（僅在有 TemplateId 時）
             TelegramMessageTemplate? template = null;
@@ -61,7 +61,7 @@ public class TelegramNotifyService : ITelegramNotifyService
             {
                 ["Now"]          = DateTime.UtcNow.ToString(),
                 ["DisplayName"]  = target.DISPLAY_NAME,
-                ["ChatId"]       = target.CHAT_ID,
+                ["ChatIds"]      = string.Join(',', target.CHAT_IDS),
                 ["TemplateCode"] = template?.CODE
             };
 
@@ -83,7 +83,7 @@ public class TelegramNotifyService : ITelegramNotifyService
             stage = FailureStage.DbWrite;
             var log = new TelegramMessageLog
             {
-                TELEGRAM_USER_ID = target.ID, // 若你同時支援群組，這裡可依 TYPE 改成 TELEGRAM_GROUP_ID
+                TELEGRAM_ID = target.ID,
                 TELEGRAM_MESSAGE_TEMPLATE_ID = template?.ID,
                 SUBJECT = subject,
                 BODY = body,
@@ -99,35 +99,37 @@ public class TelegramNotifyService : ITelegramNotifyService
             var header = string.IsNullOrWhiteSpace(subject) ? string.Empty : $"<b>{subject}</b>\n\n";
             var maxBodyLength = Math.Max(0, MaxMessageLength - header.Length);
 
-            foreach (var chunk in SplitMessageSafe(body, maxBodyLength))
+            foreach (var chatId in target.CHAT_IDS)
             {
-                var payload = new Dictionary<string, string>
+                foreach (var chunk in SplitMessageSafe(body, maxBodyLength))
                 {
-                    ["chat_id"] = target.CHAT_ID.ToString(),
-                    ["text"] = header + chunk,
-                    ["parse_mode"] = "HTML",
-                    ["disable_web_page_preview"] = "true"
-                };
-
-                using var content  = new FormUrlEncodedContent(payload);
-                using var response = await client.PostAsync("sendMessage", content, cancellationToken).ConfigureAwait(false);
-
-                if (!response.IsSuccessStatusCode)
-                {
-                    var resp = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-                    // 回寫失敗
-                    await _repository.UpdateLogStatusAsync(logId.Value, (byte)SendStatus.Failed, $"{(int)response.StatusCode} {response.StatusCode} - {resp}", null, cancellationToken).ConfigureAwait(false);
-
-                    return new TelegramSendResult
+                    var payload = new Dictionary<string, string>
                     {
-                        Success = false,
-                        Stage = FailureStage.HttpSend,
-                        Error = $"Telegram API error: {(int)response.StatusCode} {response.StatusCode}",
-                        HttpStatus = (int)response.StatusCode,
-                        LogId = logId,
-                        Subject = subject,
-                        Body = body
+                        ["chat_id"] = chatId,
+                        ["text"] = header + chunk,
+                        ["parse_mode"] = "HTML",
+                        ["disable_web_page_preview"] = "true"
                     };
+
+                    using var content  = new FormUrlEncodedContent(payload);
+                    using var response = await client.PostAsync("sendMessage", content, cancellationToken).ConfigureAwait(false);
+
+                    if (!response.IsSuccessStatusCode)
+                    {
+                        var resp = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+                        await _repository.UpdateLogStatusAsync(logId.Value, (byte)SendStatus.Failed, $"{(int)response.StatusCode} {response.StatusCode} - {resp}", null, cancellationToken).ConfigureAwait(false);
+
+                        return new TelegramSendResult
+                        {
+                            Success = false,
+                            Stage = FailureStage.HttpSend,
+                            Error = $"Telegram API error: {(int)response.StatusCode} {response.StatusCode}",
+                            HttpStatus = (int)response.StatusCode,
+                            LogId = logId,
+                            Subject = subject,
+                            Body = body
+                        };
+                    }
                 }
             }
 

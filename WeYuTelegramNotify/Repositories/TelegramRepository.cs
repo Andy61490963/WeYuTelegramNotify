@@ -26,15 +26,24 @@ public class TelegramRepository : ITelegramRepository
         }
     }
 
-    public async Task<TelegramUser?> GetSingleOrGroupAsync(Guid id, CancellationToken cancellationToken = default)
+    public async Task<TelegramTarget?> GetTargetWithChatsAsync(Guid id, CancellationToken cancellationToken = default)
     {
         await EnsureConnectionAsync(cancellationToken).ConfigureAwait(false);
-        
-        const string sqlUser = @"/**/
-SELECT TOP 1 ID, CHAT_ID, DISPLAY_NAME, TYPE, IS_ACTIVE, CREATED_AT FROM TELEGRAM_USER WHERE ID = @id";
-        var res = await _con.QueryFirstOrDefaultAsync<TelegramUser>(
-            new CommandDefinition(sqlUser, new { id }, cancellationToken: cancellationToken)).ConfigureAwait(false);
-        return res;
+
+        const string sql = @"
+SELECT ID, DISPLAY_NAME, IS_ACTIVE, CREATED_AT FROM TELEGRAM WHERE ID = @id;
+SELECT CHAT_ID FROM TELEGRAM_TARGET WHERE TELEGRAM_ID = @id;";
+
+        using var multi = await _con.QueryMultipleAsync(new CommandDefinition(sql, new { id }, cancellationToken: cancellationToken)).ConfigureAwait(false);
+        var target = await multi.ReadFirstOrDefaultAsync<TelegramTarget>().ConfigureAwait(false);
+        if (target is null)
+            return null;
+
+        var chats = await multi.ReadAsync<string>().ConfigureAwait(false);
+        foreach (var c in chats)
+            target.CHAT_IDS.Add(c);
+
+        return target;
     }
 
     public async Task<TelegramMessageTemplate?> GetTemplateByIdAsync(Guid? id, CancellationToken cancellationToken = default)
@@ -54,9 +63,9 @@ SELECT TOP 1 ID, CHAT_ID, DISPLAY_NAME, TYPE, IS_ACTIVE, CREATED_AT FROM TELEGRA
 
         const string sql = @"
 INSERT INTO TELEGRAM_MESSAGE_LOG
-    (ID, TELEGRAM_USER_ID, TELEGRAM_MESSAGE_TEMPLATE_ID, SUBJECT, BODY, STATUS, ERROR_MESSAGE, RETRY_COUNT, CREATED_AT, SENT_AT)
+    (ID, TELEGRAM_ID, TELEGRAM_MESSAGE_TEMPLATE_ID, SUBJECT, BODY, STATUS, ERROR_MESSAGE, RETRY_COUNT, CREATED_AT, SENT_AT)
 VALUES
-    (@Id, @TELEGRAM_USER_ID, @TELEGRAM_MESSAGE_TEMPLATE_ID, @SUBJECT, @BODY, @STATUS, @ERROR_MESSAGE, @RETRY_COUNT, @CREATED_AT, @SENT_AT)";
+    (@Id, @TELEGRAM_ID, @TELEGRAM_MESSAGE_TEMPLATE_ID, @SUBJECT, @BODY, @STATUS, @ERROR_MESSAGE, @RETRY_COUNT, @CREATED_AT, @SENT_AT)";
 
         await _con.ExecuteAsync(new CommandDefinition(sql, log, cancellationToken: cancellationToken)).ConfigureAwait(false);
         return log.ID;

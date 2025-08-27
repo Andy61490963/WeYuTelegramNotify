@@ -10,7 +10,7 @@ public class TelegramMessageLog
 {
     public Guid ID { get; set; }
     
-    public Guid? TELEGRAM_USER_ID { get; set; }
+    public Guid? TELEGRAM_ID { get; set; }
 
     public Guid? TELEGRAM_MESSAGE_TEMPLATE_ID { get; set; }
 
