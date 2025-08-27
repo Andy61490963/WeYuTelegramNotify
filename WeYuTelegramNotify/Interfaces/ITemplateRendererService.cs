@@ -10,6 +10,6 @@ public interface ITemplateRendererService
         string bodyTemplate,
         IReadOnlyDictionary<string, string?> data,
         CultureInfo? culture = null,
-        bool htmlEncodeValues = true);
+        bool htmlEncodeValues = false);
 }
 

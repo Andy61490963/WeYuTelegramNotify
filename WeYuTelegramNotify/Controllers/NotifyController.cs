@@ -1,3 +1,4 @@
+using System.Web;
 using Microsoft.AspNetCore.Mvc;
 using WeYuTelegramNotify.interfaces;
 using WeYuTelegramNotify.Models;
@@ -36,7 +37,7 @@ public class NotifyController : ControllerBase
             {
                 message = "sent",
                 subject = result.Subject,
-                body = result.Body,
+                body = HttpUtility.HtmlDecode(result.Body),
                 logId = result.LogId
             });
         }

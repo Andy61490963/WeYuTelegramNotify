@@ -77,7 +77,7 @@ public class TelegramNotifyService : ITelegramNotifyService
                 bodyTemplate:    bodyTpl,
                 data: tokens,
                 culture: CultureInfo.GetCultureInfo("zh-TW"),
-                htmlEncodeValues: true
+                htmlEncodeValues: false
             );
 
             // ── 5) 寫入 Log（Queued）
