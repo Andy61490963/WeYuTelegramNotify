@@ -50,6 +50,7 @@ public class Program
         builder.Services.AddAuthorization();
 
         builder.Services.Configure<TelegramBotOptions>(builder.Configuration.GetSection("TelegramBot"));
+        builder.Services.Configure<EmailSettingOptions>(builder.Configuration.GetSection("EmailSetting"));
 
         builder.Services.AddHttpClient("Telegram", (sp, client) =>
         {
@@ -64,9 +65,10 @@ public class Program
             conn.ConnectionString = builder.Configuration.GetConnectionString("Connection");
             return conn;
         });
-        
+
         builder.Services.AddScoped<ITelegramRepository, TelegramRepository>();
         builder.Services.AddScoped<ITelegramNotifyService, TelegramNotifyService>();
+        builder.Services.AddScoped<IEmailNotifyService, EmailNotifyService>();
 
         var app = builder.Build();
         

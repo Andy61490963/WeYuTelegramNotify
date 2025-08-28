@@ -151,6 +151,85 @@ public class NotifyController : ControllerBase
         }
     }
 
+    private async Task<IActionResult> SendEmailAsync(EmailNotifyRequest request, CancellationToken cancellationToken)
+    {
+        var requestId = HttpContext.Request.Headers.TryGetValue("X-Request-Id", out var rid)
+                        ? rid.ToString()
+                        : HttpContext.TraceIdentifier;
+
+        using var scope = _logger.BeginScope(new Dictionary<string, object?>
+        {
+            ["requestId"] = requestId,
+            ["route"] = HttpContext.Request.Path.Value,
+            ["method"] = HttpContext.Request.Method,
+            ["remoteIp"] = HttpContext.Connection.RemoteIpAddress?.ToString(),
+            ["userAgent"] = HttpContext.Request.Headers.UserAgent.ToString()
+        });
+
+        var startedAt = DateTimeOffset.UtcNow;
+
+        try
+        {
+            _logger.LogInformation("Incoming email notify request: {Summary}",
+                BuildEmailRequestSummarySafe(request));
+
+            if (!ModelState.IsValid)
+            {
+                var errors = ModelState
+                    .Where(kv => kv.Value?.Errors?.Count > 0)
+                    .Select(kv => new
+                    {
+                        Field = kv.Key,
+                        Messages = kv.Value!.Errors.Select(e => e.ErrorMessage).ToArray()
+                    })
+                    .ToArray();
+
+                _logger.LogWarning("Validation failed: {Errors}", errors);
+
+                return ValidationProblem(ModelState);
+            }
+
+            var result = await _emailNotifyService.SendAsync(request, cancellationToken);
+            var elapsedMs = (DateTimeOffset.UtcNow - startedAt).TotalMilliseconds;
+
+            if (result.Success)
+            {
+                _logger.LogInformation(
+                    "Email sent successfully. to={Email}, subject={Subject}, elapsedMs={Elapsed}",
+                    request.Email, request.Subject, elapsedMs);
+
+                return Ok(new { message = "sent" });
+            }
+
+            _logger.LogWarning("Email notify failed: {Error}", result.Error);
+
+            return StatusCode(StatusCodes.Status400BadRequest, new
+            {
+                message = "failed",
+                error = result.Error
+            });
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogWarning("Request cancelled by client or server token.");
+            return StatusCode(StatusCodes.Status499ClientClosedRequest, new { message = "cancelled" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unhandled exception during email notify.");
+            return StatusCode(StatusCodes.Status500InternalServerError, new
+            {
+                message = "failed",
+                stage = "UnhandledException"
+            });
+        }
+        finally
+        {
+            var totalMs = (DateTimeOffset.UtcNow - startedAt).TotalMilliseconds;
+            _logger.LogInformation("Request completed in {Elapsed} ms", totalMs);
+        }
+    }
+
     /// <summary>
     /// 
     /// </summary>
@@ -164,6 +243,20 @@ public class NotifyController : ControllerBase
         return new
         {
             req?.ChatId,
+            HasHtmlLikeTag = req?.Body?.Contains('<') == true,
+            SubjectLength = subjectLength,
+            BodyLength = bodyLength
+        };
+    }
+
+    private static object BuildEmailRequestSummarySafe(EmailNotifyRequest req)
+    {
+        var bodyLength = req?.Body?.Length ?? 0;
+        var subjectLength = req?.Subject?.Length ?? 0;
+
+        return new
+        {
+            req?.Email,
             HasHtmlLikeTag = req?.Body?.Contains('<') == true,
             SubjectLength = subjectLength,
             BodyLength = bodyLength
