@@ -10,21 +10,23 @@ namespace WeYuTelegramNotify.Controllers;
 public class NotifyController : ControllerBase
 {
     private readonly ITelegramNotifyService _telegramService;
+    private readonly IEmailNotifyService _emailNotifyService;
     private readonly ILogger<NotifyController> _logger;
 
-    public NotifyController(ILogger<NotifyController> logger, ITelegramNotifyService telegramService)
+    public NotifyController(ILogger<NotifyController> logger, ITelegramNotifyService telegramService, IEmailNotifyService emailNotifyService)
     {
         _logger = logger;
         _telegramService = telegramService;
+        _emailNotifyService = emailNotifyService;
     }
 
     [HttpGet("telegram")]
     public Task<IActionResult> GetTelegram([FromQuery] TelegramNotifyRequest request, CancellationToken cancellationToken)
         => SendTelegramAsync(request, cancellationToken);
-
-    [HttpPost("telegram")]
-    public Task<IActionResult> PostTelegramForm([FromForm] TelegramNotifyRequest request, CancellationToken cancellationToken)
-        => SendTelegramAsync(request, cancellationToken);
+    
+    [HttpGet("email")]
+    public Task<IActionResult> SendEmail([FromQuery] EmailNotifyRequest request, CancellationToken cancellationToken)
+        => SendEmailAsync(request, cancellationToken);
 
     private async Task<IActionResult> SendTelegramAsync(TelegramNotifyRequest request, CancellationToken cancellationToken)
     {
