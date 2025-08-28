@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.Text.RegularExpressions;
 using WeYuTelegramNotify.Enum;
+using WeYuTelegramNotify.Helper;
 using WeYuTelegramNotify.interfaces;
 using WeYuTelegramNotify.Models;
 using WeYuTelegramNotify.Repositories;
@@ -34,9 +35,28 @@ public class TelegramNotifyService : ITelegramNotifyService
 
         try
         {
+            if (!request.SecretKey.MatchesSecret("WeYuTelegraiApi"))
+            {
+                return new TelegramSendResult
+                {
+                    Success = false,
+                    Stage = FailureStage.Validation,
+                    Error = "未授權"
+                };
+            }
+            
+            if (string.IsNullOrWhiteSpace(request.SecretKey))
+                return new TelegramSendResult { Success = false, Stage = FailureStage.Validation, Error = "SecretKey is required." };
+            
             if (string.IsNullOrWhiteSpace(request.Body))
                 return new TelegramSendResult { Success = false, Stage = FailureStage.Validation, Error = "Body is required." };
 
+            if (string.IsNullOrWhiteSpace(request.ChatId))
+                return new TelegramSendResult { Success = false, Stage = FailureStage.Validation, Error = "ChatId is required." };
+
+            if (string.IsNullOrWhiteSpace(request.BotToken))
+                return new TelegramSendResult { Success = false, Stage = FailureStage.Validation, Error = "BotToken is required." };
+            
             // ── Token 替換
             var tokens = new Dictionary<string, string?>(request.Tokens, StringComparer.OrdinalIgnoreCase)
             {
@@ -61,6 +81,10 @@ public class TelegramNotifyService : ITelegramNotifyService
 
             stage = FailureStage.HttpSend;
             var client = _httpClientFactory.CreateClient("Telegram");
+            
+            // 不設定 BaseAddress，改用完整 URL（避免多 Token 併發踩到）
+            var url = $"https://api.telegram.org/bot{request.BotToken}/sendMessage";
+            
             var header = string.IsNullOrWhiteSpace(subject) ? string.Empty : $"<b>{subject}</b>\n\n";
             var maxBodyLength = Math.Max(0, MaxMessageLength - header.Length);
 
@@ -75,7 +99,7 @@ public class TelegramNotifyService : ITelegramNotifyService
                 };
 
                 using var content  = new FormUrlEncodedContent(payload);
-                using var response = await client.PostAsync("sendMessage", content, cancellationToken).ConfigureAwait(false);
+                using var response = await client.PostAsync(url, content, cancellationToken).ConfigureAwait(false);
 
                 if (!response.IsSuccessStatusCode)
                 {

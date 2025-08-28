@@ -5,8 +5,15 @@ namespace WeYuTelegramNotify.Models;
 public class TelegramNotifyRequest : IValidatableObject
 {
     [Required]
+    public string SecretKey { get; set; } = string.Empty;
+    
+    [Required]
+    public string BotToken { get; set; } = string.Empty;
+
+    [Required]
     public string ChatId { get; set; } = string.Empty;
 
+    [Required]
     public string? Subject { get; set; }
 
     [Required]
