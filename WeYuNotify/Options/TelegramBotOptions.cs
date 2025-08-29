@@ -1,4 +1,4 @@
-namespace WeYuTelegramNotify.Options;
+namespace WeYuNotify.Options;
 
 public class TelegramBotOptions
 {

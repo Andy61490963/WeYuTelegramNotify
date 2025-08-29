@@ -1,6 +1,6 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WeYuTelegramNotify", "WeYuTelegramNotify\WeYuTelegramNotify.csproj", "{F2BD3734-0EAE-4811-AA59-652B4824B3EB}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WeYuNotify", "WeYuNotify\WeYuNotify.csproj", "{F2BD3734-0EAE-4811-AA59-652B4824B3EB}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{3640B126-24C3-4A94-8219-06319DDE732D}"
 	ProjectSection(SolutionItems) = preProject
