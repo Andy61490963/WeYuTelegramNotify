@@ -24,15 +24,18 @@ public class EmailNotifyService : IEmailNotifyService
     private readonly EmailSettingOptions _settings;
     private readonly IEmailGroupRepository _groupRepository;
     private readonly IEmailLogRepository _logRepository;
+    private readonly ILogger<EmailNotifyService> _logger;
 
     public EmailNotifyService(
         IOptions<EmailSettingOptions> options,
         IEmailGroupRepository groupRepository,
-        IEmailLogRepository logRepository)
+        IEmailLogRepository logRepository,
+        ILogger<EmailNotifyService> logger)
     {
         _settings = options.Value;
         _groupRepository = groupRepository;
         _logRepository = logRepository;
+        _logger = logger;
     }
 
     /// <summary>
@@ -44,9 +47,16 @@ public class EmailNotifyService : IEmailNotifyService
     public async Task<EmailSendResult> SendAsync(EmailNotifyRequest request, CancellationToken cancellationToken = default)
     {
         Guid? logId = null;
+        var started = System.Diagnostics.Stopwatch.StartNew();
 
         try
         {
+            // 紀錄 LOG 摘要
+            _logger.LogInformation("Email single: validating to={To}, subjectLen={SubjectLen}, bodyLen={BodyLen}",
+                request.Email,
+                request.Subject,
+                request.Body);
+            
             // --- 基本檢查 ---
             if (!request.SecretKey.MatchesSecret(ApiSecret))
                 return new EmailSendResult { Success = false, Error = "未授權" };
@@ -61,7 +71,7 @@ public class EmailNotifyService : IEmailNotifyService
             GuardHeader(request.Subject);
             var normalizedEmail = NormalizeEmail(request.Email);
             var to = new MailAddress(normalizedEmail); // 會拋格式錯
-
+            
             // --- 建立主 Log ---
             var log = new EmailLog
             {
@@ -74,17 +84,27 @@ public class EmailNotifyService : IEmailNotifyService
             };
             logId = await _logRepository.InsertLogAsync(log, cancellationToken).ConfigureAwait(false);
 
+            using var scope = _logger.BeginScope(new Dictionary<string, object?>
+            {
+                ["logId"] = logId
+            });
+            _logger.LogInformation("Email single queued. logId={LogId}", logId);
+            
             // --- 重用同一個 SMTP 連線 ---
             using var smtp = CreateSmtpClient();
 
             // --- 送信 ---
             await SendOneAsync(smtp, to, request.Subject, request.Body, cancellationToken).ConfigureAwait(false);
             
+            _logger.LogInformation("Email single success to={To} elapsedMs={Elapsed}",
+                to.Address, started.Elapsed.TotalMilliseconds);
+            
             await _logRepository.UpdateLogStatusAsync(logId.Value, (byte)SendStatus.Success, null, DateTime.UtcNow, cancellationToken).ConfigureAwait(false);
             return new EmailSendResult { Success = true, LogId = logId };
         }
         catch (Exception ex)
         {
+            _logger.LogError(ex, "Email single failed. logId={LogId}, to={To}", logId, request.Email);
             if (logId.HasValue)
             {
                 try
@@ -106,9 +126,13 @@ public class EmailNotifyService : IEmailNotifyService
     public async Task<GroupEmailSendResult> SendGroupAsync(GroupEmailNotifyRequest request, CancellationToken cancellationToken = default)
     {
         Guid? logId = null;
-
+        var started = System.Diagnostics.Stopwatch.StartNew();
+        
         try
         {
+            _logger.LogInformation("Email group: validating groupId={GroupId}, subjectLen={SubjectLen}, bodyLen={BodyLen}",
+                request.GroupId, request.Subject, request.Body);
+            
             if (!request.SecretKey.MatchesSecret(ApiSecret))
                 return new GroupEmailSendResult { Success = false, Error = "未授權" };
             if (request.GroupId == Guid.Empty)
@@ -136,6 +160,10 @@ public class EmailNotifyService : IEmailNotifyService
                 .Cast<MailAddress>()
                 .ToList();
 
+            _logger.LogInformation("Email group: recipients total={Total}, valid={Valid}", 
+                (await _groupRepository.GetEmailsByGroupAsync(request.GroupId, cancellationToken))?.Count() ?? 0,
+                validRecipients.Count);
+            
             if (validRecipients.Count == 0)
                 return new GroupEmailSendResult { Success = false, Error = "No active/valid emails found." };
 
@@ -151,6 +179,11 @@ public class EmailNotifyService : IEmailNotifyService
             };
             logId = await _logRepository.InsertLogAsync(log, cancellationToken).ConfigureAwait(false);
             
+            using var scope = _logger.BeginScope(new Dictionary<string, object?> {
+                ["logId"] = logId, ["groupId"] = request.GroupId
+            });
+            _logger.LogInformation("Email group queued. logId={LogId}, groupId={GroupId}", logId, request.GroupId);
+            
             int sent = 0, failed = 0;
             using var smtp = CreateSmtpClient();
 
@@ -158,14 +191,17 @@ public class EmailNotifyService : IEmailNotifyService
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
+                _logger.LogDebug("Email Send start -> {To}", addr.Address);
                 try
                 {
                     await SendOneAsync(smtp, addr, request.Subject, request.Body, cancellationToken).ConfigureAwait(false);
                     sent++;
+                    _logger.LogDebug("Email Send ok -> {To}", addr.Address);
                 }
-                catch
+                catch (Exception ex)
                 {
                     failed++;
+                    _logger.LogWarning(ex, "Email Send fail -> {To}", addr.Address);
                 }
 
                 // 簡單節流，不要對 Smtp server 瘋狂請求
@@ -176,6 +212,9 @@ public class EmailNotifyService : IEmailNotifyService
             var status = (sent > 0) ? SendStatus.Success : SendStatus.Failed;
             var note = (failed > 0 && sent > 0) ? $"Partial failed: {failed}." : (failed > 0 ? "All failed." : null);
 
+            _logger.LogInformation("Email group done. sent={Sent}, failed={Failed}, elapsedMs={Elapsed}",
+                sent, failed, started.Elapsed.TotalMilliseconds);
+            
             await _logRepository.UpdateLogStatusAsync(
                 logId.Value, (byte)status, note, DateTime.UtcNow, cancellationToken).ConfigureAwait(false);
 
@@ -189,6 +228,7 @@ public class EmailNotifyService : IEmailNotifyService
         }
         catch (Exception ex)
         {
+            _logger.LogError(ex, "Email group failed. logId={LogId}, groupId={GroupId}", logId, request.GroupId);
             if (logId.HasValue)
             {
                 try
@@ -223,8 +263,12 @@ public class EmailNotifyService : IEmailNotifyService
                 await smtp.SendMailAsync(msg, ct).ConfigureAwait(false);
                 return; // success
             }
-            catch (SmtpFailedRecipientException)
+            catch (SmtpFailedRecipientException ex)
             {
+                _logger.LogWarning(ex, "Recipient failed (will{WillRetry}) to={To}, attempt={Attempt}/{Max}",
+                    i < MaxRetry - 1 ? " retry" : " not retry",
+                    to.Address, i + 1, MaxRetry);
+                
                 // 單一收件者層級錯誤
                 if (i >= MaxRetry - 1) throw;
                 // 少數收件端會回暫時性 4xx，但 SmtpFailedRecipientException 沒有狀態碼區分
@@ -232,6 +276,10 @@ public class EmailNotifyService : IEmailNotifyService
             }
             catch (SmtpException ex) when (i < MaxRetry - 1 && IsTransient(ex.StatusCode))
             {
+                var delay = BackoffDelay(i).TotalMilliseconds;
+                _logger.LogWarning(ex, "Transient SMTP error: status={Status}, to={To}, attempt={Attempt}/{Max}, backoffMs={Delay}",
+                    ex.StatusCode, to.Address, i + 1, MaxRetry, delay);
+                
                 await Task.Delay(BackoffDelay(i), ct).ConfigureAwait(false);
             }
         }

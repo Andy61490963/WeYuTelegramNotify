@@ -26,8 +26,6 @@ public class NotifyController : ControllerBase
     // ----------------------
     // Telegram
     // ----------------------
-
-    /// <summary>（POST 推薦）發送 Telegram 訊息</summary>
     [HttpPost("telegram")]
     [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
@@ -49,7 +47,6 @@ public class NotifyController : ControllerBase
                 {
                     FailureStage.Validation => StatusCodes.Status400BadRequest,
                     FailureStage.HttpSend   => StatusCodes.Status502BadGateway,
-                    FailureStage.DbWrite    => StatusCodes.Status500InternalServerError,
                     _                       => StatusCodes.Status500InternalServerError
                 };
                 return StatusCode(status, new
@@ -71,8 +68,6 @@ public class NotifyController : ControllerBase
     // ----------------------
     // 單一 Email
     // ----------------------
-
-    /// <summary>（POST 推薦）單一 Email 發送</summary>
     [HttpPost("email")]
     [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
@@ -98,8 +93,6 @@ public class NotifyController : ControllerBase
     // ----------------------
     // 群組 Email
     // ----------------------
-
-    /// <summary>（POST 推薦）依群組發信（支援父/子群組展開）</summary>
     [HttpPost("groupEmail")]
     [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
@@ -169,6 +162,7 @@ public class NotifyController : ControllerBase
                 return ValidationProblem(ModelState);
             }
 
+            _logger.LogInformation("-----------------------------------------------------------------------------------------------------------------------------");
             _logger.LogInformation("Incoming request: {Summary}", summaryBuilder(request));
 
             var result = await doSendAsync(request, ct).ConfigureAwait(false);
@@ -228,8 +222,7 @@ public class NotifyController : ControllerBase
         {
             req?.ChatId,
             SubjectLength = req?.Subject?.Length ?? 0,
-            BodyLength = req?.Body?.Length ?? 0,
-            HasHtmlLikeTag = req?.Body?.Contains('<') == true
+            BodyLength = req?.Body?.Length ?? 0
         };
 
     private static object BuildEmailRequestSummarySafe(EmailNotifyRequest req)
@@ -237,8 +230,7 @@ public class NotifyController : ControllerBase
         {
             req?.Email,
             SubjectLength = req?.Subject?.Length ?? 0,
-            BodyLength = req?.Body?.Length ?? 0,
-            HasHtmlLikeTag = req?.Body?.Contains('<') == true
+            BodyLength = req?.Body?.Length ?? 0
         };
 
     private static object BuildGroupEmailRequestSummarySafe(GroupEmailNotifyRequest req)
