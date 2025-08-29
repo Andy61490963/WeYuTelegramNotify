@@ -67,6 +67,7 @@ public class Program
         });
 
         builder.Services.AddScoped<ITelegramRepository, TelegramRepository>();
+        builder.Services.AddScoped<IEmailGroupRepository, EmailGroupRepository>();
         builder.Services.AddScoped<ITelegramNotifyService, TelegramNotifyService>();
         builder.Services.AddScoped<IEmailNotifyService, EmailNotifyService>();
 

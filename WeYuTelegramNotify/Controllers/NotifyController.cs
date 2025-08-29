@@ -34,6 +34,16 @@ public class NotifyController : ControllerBase
     public Task<IActionResult> SendEmail([FromQuery] EmailNotifyRequest request, CancellationToken cancellationToken)
         => SendEmailAsync(request, cancellationToken);
 
+    /// <summary>
+    /// 依群組發信
+    /// </summary>
+    /// <param name="request"></param>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
+    [HttpGet("groupEmail")]
+    public Task<IActionResult> SendGroupEmail([FromQuery] GroupEmailNotifyRequest request, CancellationToken cancellationToken)
+        => SendGroupEmailAsync(request, cancellationToken);
+
     private async Task<IActionResult> SendTelegramAsync(TelegramNotifyRequest request, CancellationToken cancellationToken)
     {
         // ---- 建立可追蹤的 scope：把 requestId / route / user-agent 等塞進 scope，之後每筆 log 都會帶到 ----
@@ -236,6 +246,85 @@ public class NotifyController : ControllerBase
         }
     }
 
+    private async Task<IActionResult> SendGroupEmailAsync(GroupEmailNotifyRequest request, CancellationToken cancellationToken)
+    {
+        var requestId = HttpContext.Request.Headers.TryGetValue("X-Request-Id", out var rid)
+                        ? rid.ToString()
+                        : HttpContext.TraceIdentifier;
+
+        using var scope = _logger.BeginScope(new Dictionary<string, object?>
+        {
+            ["requestId"] = requestId,
+            ["route"] = HttpContext.Request.Path.Value,
+            ["method"] = HttpContext.Request.Method,
+            ["remoteIp"] = HttpContext.Connection.RemoteIpAddress?.ToString(),
+            ["userAgent"] = HttpContext.Request.Headers.UserAgent.ToString()
+        });
+
+        var startedAt = DateTimeOffset.UtcNow;
+
+        try
+        {
+            _logger.LogInformation("Incoming group email notify request: {Summary}",
+                BuildGroupEmailRequestSummarySafe(request));
+
+            if (!ModelState.IsValid)
+            {
+                var errors = ModelState
+                    .Where(kv => kv.Value?.Errors?.Count > 0)
+                    .Select(kv => new
+                    {
+                        Field = kv.Key,
+                        Messages = kv.Value!.Errors.Select(e => e.ErrorMessage).ToArray()
+                    })
+                    .ToArray();
+
+                _logger.LogWarning("Validation failed: {Errors}", errors);
+
+                return ValidationProblem(ModelState);
+            }
+
+            var result = await _emailNotifyService.SendGroupAsync(request, cancellationToken);
+            var elapsedMs = (DateTimeOffset.UtcNow - startedAt).TotalMilliseconds;
+
+            if (result.Success)
+            {
+                _logger.LogInformation(
+                    "Group email sent successfully. group={GroupId}, count={Count}, elapsedMs={Elapsed}",
+                    request.GroupId, result.SentCount, elapsedMs);
+
+                return Ok(new { message = "sent", count = result.SentCount });
+            }
+
+            _logger.LogWarning("Group email notify failed: {Error}", result.Error);
+
+            return StatusCode(StatusCodes.Status400BadRequest, new
+            {
+                message = "failed",
+                error = result.Error
+            });
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogWarning("Request cancelled by client or server token.");
+            return StatusCode(StatusCodes.Status499ClientClosedRequest, new { message = "cancelled" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unhandled exception during group email notify.");
+            return StatusCode(StatusCodes.Status500InternalServerError, new
+            {
+                message = "failed",
+                stage = "UnhandledException"
+            });
+        }
+        finally
+        {
+            var totalMs = (DateTimeOffset.UtcNow - startedAt).TotalMilliseconds;
+            _logger.LogInformation("Request completed in {Elapsed} ms", totalMs);
+        }
+    }
+
     /// <summary>
     /// 
     /// </summary>
@@ -264,6 +353,19 @@ public class NotifyController : ControllerBase
         {
             req?.Email,
             HasHtmlLikeTag = req?.Body?.Contains('<') == true,
+            SubjectLength = subjectLength,
+            BodyLength = bodyLength
+        };
+    }
+
+    private static object BuildGroupEmailRequestSummarySafe(GroupEmailNotifyRequest req)
+    {
+        var bodyLength = req?.Body?.Length ?? 0;
+        var subjectLength = req?.Subject?.Length ?? 0;
+
+        return new
+        {
+            req?.GroupId,
             SubjectLength = subjectLength,
             BodyLength = bodyLength
         };
