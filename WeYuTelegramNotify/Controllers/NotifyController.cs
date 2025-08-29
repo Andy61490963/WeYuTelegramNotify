@@ -24,7 +24,13 @@ public class NotifyController : ControllerBase
     public Task<IActionResult> GetTelegram([FromQuery] TelegramNotifyRequest request, CancellationToken cancellationToken)
         => SendTelegramAsync(request, cancellationToken);
     
-    [HttpGet("email")]
+    /// <summary>
+    /// 單一發信
+    /// </summary>
+    /// <param name="request"></param>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
+    [HttpGet("singleEmail")]
     public Task<IActionResult> SendEmail([FromQuery] EmailNotifyRequest request, CancellationToken cancellationToken)
         => SendEmailAsync(request, cancellationToken);
 
@@ -150,7 +156,7 @@ public class NotifyController : ControllerBase
             _logger.LogInformation("Request completed in {Elapsed} ms", totalMs);
         }
     }
-
+    
     private async Task<IActionResult> SendEmailAsync(EmailNotifyRequest request, CancellationToken cancellationToken)
     {
         var requestId = HttpContext.Request.Headers.TryGetValue("X-Request-Id", out var rid)
