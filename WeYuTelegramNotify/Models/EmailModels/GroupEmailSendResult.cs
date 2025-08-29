@@ -1,3 +1,5 @@
+using System;
+
 namespace WeYuTelegramNotify.Models;
 
 /// <summary>
@@ -19,5 +21,8 @@ public class GroupEmailSendResult
     /// 失敗時的錯誤訊息。
     /// </summary>
     public string? Error { get; init; }
+
+    /// <summary>資料庫 Log 主鍵。</summary>
+    public Guid? LogId { get; init; }
 }
 

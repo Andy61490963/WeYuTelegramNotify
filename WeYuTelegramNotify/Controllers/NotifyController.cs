@@ -211,18 +211,19 @@ public class NotifyController : ControllerBase
             if (result.Success)
             {
                 _logger.LogInformation(
-                    "Email sent successfully. to={Email}, subject={Subject}, elapsedMs={Elapsed}",
-                    request.Email, request.Subject, elapsedMs);
+                    "Email sent successfully. logId={LogId}, to={Email}, subject={Subject}, elapsedMs={Elapsed}",
+                    result.LogId, request.Email, request.Subject, elapsedMs);
 
-                return Ok(new { message = "sent" });
+                return Ok(new { message = "sent", logId = result.LogId });
             }
 
-            _logger.LogWarning("Email notify failed: {Error}", result.Error);
+            _logger.LogWarning("Email notify failed: {Error}, logId={LogId}", result.Error, result.LogId);
 
             return StatusCode(StatusCodes.Status400BadRequest, new
             {
                 message = "failed",
-                error = result.Error
+                error = result.Error,
+                logId = result.LogId
             });
         }
         catch (OperationCanceledException)
@@ -290,18 +291,19 @@ public class NotifyController : ControllerBase
             if (result.Success)
             {
                 _logger.LogInformation(
-                    "Group email sent successfully. group={GroupId}, count={Count}, elapsedMs={Elapsed}",
-                    request.GroupId, result.SentCount, elapsedMs);
+                    "Group email sent successfully. logId={LogId}, group={GroupId}, count={Count}, elapsedMs={Elapsed}",
+                    result.LogId, request.GroupId, result.SentCount, elapsedMs);
 
-                return Ok(new { message = "sent", count = result.SentCount });
+                return Ok(new { message = "sent", count = result.SentCount, logId = result.LogId });
             }
 
-            _logger.LogWarning("Group email notify failed: {Error}", result.Error);
+            _logger.LogWarning("Group email notify failed: {Error}, logId={LogId}", result.Error, result.LogId);
 
             return StatusCode(StatusCodes.Status400BadRequest, new
             {
                 message = "failed",
-                error = result.Error
+                error = result.Error,
+                logId = result.LogId
             });
         }
         catch (OperationCanceledException)
