@@ -33,9 +33,9 @@ public class EmailLogRepository : IEmailLogRepository
 
         const string sql = @"
 INSERT INTO EMAIL_LOG
-    (ID, EMAIL_GROUP_ID, SUBJECT, BODY, STATUS, ERROR_MESSAGE, RETRY_COUNT, CREATED_AT, SENT_AT)
+    (ID, EMAIL_GROUP_ID, SUBJECT, BODY, STATUS, ERROR_MESSAGE, RETRY_COUNT, CREATED_AT)
 VALUES
-    (@ID, @EMAIL_GROUP_ID, @SUBJECT, @BODY, @STATUS, @ERROR_MESSAGE, @RETRY_COUNT, @CREATED_AT, @SENT_AT)";
+    (@ID, @EMAIL_GROUP_ID, @SUBJECT, @BODY, @STATUS, @ERROR_MESSAGE, @RETRY_COUNT, @CREATED_AT)";
 
         await _con.ExecuteAsync(new CommandDefinition(sql, log, cancellationToken: cancellationToken)).ConfigureAwait(false);
         return log.ID;
@@ -46,8 +46,8 @@ VALUES
         await EnsureConnectionAsync(cancellationToken).ConfigureAwait(false);
 
         const string sql = @"UPDATE EMAIL_LOG
-                             SET STATUS = @Status, ERROR_MESSAGE = @ErrorMessage, SENT_AT = @SentAt
+                             SET STATUS = @Status, ERROR_MESSAGE = @ErrorMessage
                              WHERE ID = @Id";
-        await _con.ExecuteAsync(new CommandDefinition(sql, new { Id = id, Status = status, ErrorMessage = errorMessage, SentAt = sentAt }, cancellationToken: cancellationToken)).ConfigureAwait(false);
+        await _con.ExecuteAsync(new CommandDefinition(sql, new { Id = id, Status = status, ErrorMessage = errorMessage }, cancellationToken: cancellationToken)).ConfigureAwait(false);
     }
 }

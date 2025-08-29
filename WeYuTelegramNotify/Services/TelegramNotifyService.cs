@@ -88,6 +88,7 @@ public class TelegramNotifyService : ITelegramNotifyService
             var header = string.IsNullOrWhiteSpace(subject) ? string.Empty : $"<b>{subject}</b>\n\n";
             var maxBodyLength = Math.Max(0, MaxMessageLength - header.Length);
 
+            // 因為 4096 關係 所以才分段
             foreach (var chunk in SplitMessageSafe(body, maxBodyLength))
             {
                 var payload = new Dictionary<string, string>

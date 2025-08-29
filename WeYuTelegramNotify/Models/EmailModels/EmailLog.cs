@@ -33,7 +33,4 @@ public class EmailLog
 
     /// <summary>建立時間（UTC）。</summary>
     public DateTime CREATED_AT { get; set; }
-
-    /// <summary>實際寄出時間（UTC）。</summary>
-    public DateTime? SENT_AT { get; set; }
 }

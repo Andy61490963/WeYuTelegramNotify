@@ -26,6 +26,12 @@ public class EmailNotifyService : IEmailNotifyService
         _logRepository = logRepository;
     }
 
+    /// <summary>
+    /// 單發
+    /// </summary>
+    /// <param name="request"></param>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
     public async Task<EmailSendResult> SendAsync(EmailNotifyRequest request, CancellationToken cancellationToken = default)
     {
         Guid? logId = null;
@@ -77,6 +83,12 @@ public class EmailNotifyService : IEmailNotifyService
         }
     }
 
+    /// <summary>
+    /// 群發
+    /// </summary>
+    /// <param name="request"></param>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
     public async Task<GroupEmailSendResult> SendGroupAsync(GroupEmailNotifyRequest request, CancellationToken cancellationToken = default)
     {
         Guid? logId = null;
