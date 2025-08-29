@@ -1,0 +1,53 @@
+using System.Data;
+using Dapper;
+using Microsoft.Data.SqlClient;
+using WeYuNotify.Models;
+
+namespace WeYuNotify.Repositories;
+
+/// <summary>
+/// Dapper based implementation for <see cref="IEmailLogRepository"/>.
+/// </summary>
+public class EmailLogRepository : IEmailLogRepository
+{
+    private readonly SqlConnection _con;
+
+    public EmailLogRepository(SqlConnection con)
+    {
+        _con = con;
+    }
+
+    private async Task EnsureConnectionAsync(CancellationToken cancellationToken)
+    {
+        if (_con.State != ConnectionState.Open)
+        {
+            await _con.OpenAsync(cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    public async Task<Guid> InsertLogAsync(EmailLog log, CancellationToken cancellationToken = default)
+    {
+        await EnsureConnectionAsync(cancellationToken).ConfigureAwait(false);
+
+        log.ID = log.ID == Guid.Empty ? Guid.NewGuid() : log.ID;
+
+        const string sql = @"
+INSERT INTO EMAIL_LOG
+    (ID, EMAIL_GROUP_ID, SUBJECT, BODY, STATUS, ERROR_MESSAGE, RETRY_COUNT, CREATED_AT)
+VALUES
+    (@ID, @EMAIL_GROUP_ID, @SUBJECT, @BODY, @STATUS, @ERROR_MESSAGE, @RETRY_COUNT, @CREATED_AT)";
+
+        await _con.ExecuteAsync(new CommandDefinition(sql, log, cancellationToken: cancellationToken)).ConfigureAwait(false);
+        return log.ID;
+    }
+
+    public async Task UpdateLogStatusAsync(Guid id, byte status, string? errorMessage, DateTime? sentAt, CancellationToken cancellationToken = default)
+    {
+        await EnsureConnectionAsync(cancellationToken).ConfigureAwait(false);
+
+        const string sql = @"UPDATE EMAIL_LOG
+                             SET STATUS = @Status, ERROR_MESSAGE = @ErrorMessage
+                             WHERE ID = @Id";
+        await _con.ExecuteAsync(new CommandDefinition(sql, new { Id = id, Status = status, ErrorMessage = errorMessage }, cancellationToken: cancellationToken)).ConfigureAwait(false);
+    }
+}
